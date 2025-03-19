@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@/app/models/*": ["src/app/models/*"]
     }
-  }
+  },
+  "include": ["src"]
 }
