@@ -25,7 +25,7 @@ export default function PatientLayout({ children }) {
             setLoggedInUser(session?.user);
             setLoading(false);
         }, 500);
-    }, [getSession]);
+    }, []);
 
     // Define menu items in an array
     const menuItems = [
@@ -42,7 +42,7 @@ export default function PatientLayout({ children }) {
         {
             key: "3",
             icon: <FaUser size={18} />,
-            label: <Link href="/admin/therapists">Therapists</Link>,
+            label: <Link href="/admin/users">Users</Link>,
         },
         {
             key: "4",

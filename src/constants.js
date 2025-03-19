@@ -1,4 +1,4 @@
-export const S3BUCKETNAME = "my-dixxanta-bucket";
+export const S3BUCKETNAME = "calmly-bucket";
 // export const S3BUCKETNAME = "my-local-bucket";
 export const USERTABLENAME = "users";
 export const APPOINTMENTSTABLENAME = "appointments";

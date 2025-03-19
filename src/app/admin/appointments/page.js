@@ -47,7 +47,7 @@ export default function Appointments() {
         if (loggedInUser && loggedInUser.role === "admin") {
             fetchAppointments();
         }
-    }, [loggedInUser]);
+    }, [loggedInUser, messageApi]);
 
 
     useEffect(() => {

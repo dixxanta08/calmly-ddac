@@ -2,7 +2,7 @@
 import { getSession } from "next-auth/react";
 import { User } from "@/app/models"; // Your User model
 
-const handler = (req, res) => {
+const handler = async (req, res) => {
     if (req.method !== "POST") {
         return res.status(405).json({ message: "Method Not Allowed" });
     }

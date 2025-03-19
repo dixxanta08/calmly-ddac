@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { getTherapists } from "@/services/apiService";
 import { Spin, Card, Button, Row, Col } from "antd";
 import { PlusOutlined } from "@ant-design/icons";
+import Image from "next/image";
 
 export default function Therapists() {
 
@@ -51,7 +52,7 @@ export default function Therapists() {
                         <Card
                             hoverable
                             cover={
-                                <img
+                                <Image
                                     alt={therapist.name}
                                     src={therapist.imageUrl || "/profile.png"}
                                     className="h-40 object-cover"

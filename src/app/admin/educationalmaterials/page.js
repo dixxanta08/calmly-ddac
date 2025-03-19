@@ -27,7 +27,7 @@ export default function EducationalMaterialPage() {
             setIsLoading(false);
         };
         fetchMaterials();
-    }, []);
+    }, [messageApi]);
 
     const handleUpload = async (file) => {
         console.log("Uploading file:", file);

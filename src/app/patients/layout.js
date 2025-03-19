@@ -25,7 +25,7 @@ export default function PatientLayout({ children }) {
             setLoggedInUser(session?.user);
             setLoading(false);
         }, 500);
-    }, [getSession]);
+    }, []);
 
     // Define menu items in an array
     const menuItems = [

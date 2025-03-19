@@ -48,7 +48,7 @@ export default function Appointments() {
         if (loggedInUser && loggedInUser.role === "therapist") {
             fetchAppointments();
         }
-    }, [loggedInUser]);
+    }, [loggedInUser, messageApi]);
 
 
     useEffect(() => {

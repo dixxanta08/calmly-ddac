@@ -42,7 +42,7 @@ export default function EducationalMaterialPage() {
         if (loggedInUser && loggedInUser.role === "therapist") {
             fetchMaterials();
         }
-    }, [loggedInUser]);
+    }, [loggedInUser, messageApi]);
 
 
 

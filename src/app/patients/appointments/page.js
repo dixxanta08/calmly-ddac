@@ -47,7 +47,7 @@ export default function Appointments() {
             setLoading(false);
         }
         fetchAppointments();
-    }, [loggedInUser]);
+    }, [loggedInUser, messageApi]);
 
 
     useEffect(() => {

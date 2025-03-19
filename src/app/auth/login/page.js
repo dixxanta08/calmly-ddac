@@ -28,7 +28,7 @@ export default function LoginPage() {
             }
         }
         checkUser();
-    }, [])
+    }, [router])
 
     const handleSubmit = async (values) => {
         const { email, password } = values;
@@ -92,7 +92,7 @@ export default function LoginPage() {
                     </Form.Item>
                 </Form>
                 <Link href="/auth/register" className="text-blue-600">
-                    Don't have an account? Register
+                    Don&apos;t have an account? Register
                 </Link>
                 <br />
                 <Link href="/auth/reset-password" className="text-gray-700">

@@ -1,6 +1,7 @@
 
 "use client";
 import { getEducationalMaterials, getTherapists } from '@/services/apiService';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 
@@ -69,8 +70,8 @@ const Home = () => {
       <section className="pt-32 pb-20 bg-gradient-to-br from-blue-50 via-green-50 to-blue-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h1 className="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl md:text-6xl">
-            <span className="block">You're Not Alone.</span>
-            <span className="block text-blue-600">We're Here to Help.</span>
+            <span className="block">You&apos;re Not Alone.</span>
+            <span className="block text-blue-600">We&apos;re Here to Help.</span>
           </h1>
           <p className="mt-6 text-xl text-gray-500">
             Professional mental health support and resources to guide you through your journey to wellness.
@@ -92,7 +93,7 @@ const Home = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {therapists?.map((therapist, index) => (
               <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-                <img src={therapist.imageUrl || '/default-therapist.jpg'} alt={therapist.name} className="w-full h-48 object-cover" />
+                <Image src={therapist?.imageUrl} alt={therapist.name} className="w-full h-48 object-cover" />
                 <div className="p-6">
                   <h3 className="text-xl font-semibold text-gray-900">{therapist.name}</h3>
                   <p className="mt-2 text-gray-600">{therapist.email}</p>
@@ -113,7 +114,7 @@ const Home = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {educationalMaterials?.map((material, index) => (
               <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-                <img src={material.image || '/default-resource.jpg'} alt={material.title} className="w-full h-48 object-cover" />
+                {/* <Image src={material?.image } alt={material.title} className="w-full h-48 object-cover" /> */}
                 <div className="p-6">
                   <h3 className="text-xl font-semibold text-gray-900">{material.title}</h3>
                   <p className="mt-2 text-gray-600">{material.description}</p>

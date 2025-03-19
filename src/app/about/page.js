@@ -57,7 +57,7 @@ const AboutUs = () => {
                         Our platform connects you with experienced therapists and provides access to helpful resources to support your mental well-being.
                     </p>
                     <p className="mt-4 text-lg text-gray-600 leading-relaxed">
-                        Your mental health matters. You're not alone — we're here to help.
+                        Your mental health matters. You&apos;re not alone — we&apos;re here to help.
                     </p>
                 </div>
             </section>
