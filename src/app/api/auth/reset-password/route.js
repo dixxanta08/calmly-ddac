@@ -1,11 +1,26 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { User } from '@/app/models/index';
+import AWS from 'aws-sdk';
+
+const dynamoDb = new AWS.DynamoDB.DocumentClient({
+    endpoint: process.env.NEXT_PUBLIC_DYNAMODB_ENDPOINT,
+    region: process.env.NEXT_PUBLIC_AWS_REGION,
+    accessKeyId: process.env.NEXT_PUBLIC_DYNAMODB_ACCESS_KEY_ID,
+    secretAccessKey: process.env.NEXT_PUBLIC_DYNAMODB_SECRET_ACCESS_KEY,
+});
 
 // Fetch user by email
 const getUserByEmail = async (email) => {
     try {
-        return await User.findOne({ where: { email } });
+        const params = {
+            TableName: 'users',
+            FilterExpression: 'email = :email',
+            ExpressionAttributeValues: {
+                ':email': email
+            }
+        };
+        const result = await dynamoDb.scan(params).promise();
+        return result.Items[0]; // Return the first matching user
     } catch (error) {
         console.error('Error fetching user by email:', error);
         throw new Error('Failed to fetch user by email');
@@ -33,10 +48,21 @@ export async function PUT(req) {
         }
 
         // Hash the new password
-        const hashedPassword = bcrypt.hashSync(password, 10);
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-        // Update the password in the database
-        await existingUser.update({ password: hashedPassword });
+        // Update the password in DynamoDB
+        const params = {
+            TableName: 'users',
+            Key: { id: existingUser.id },
+            UpdateExpression: 'set password = :password, updatedAt = :updatedAt',
+            ExpressionAttributeValues: {
+                ':password': hashedPassword,
+                ':updatedAt': new Date().toISOString()
+            },
+            ReturnValues: 'ALL_NEW'
+        };
+
+        await dynamoDb.update(params).promise();
 
         return NextResponse.json(
             { message: 'Password updated successfully' },

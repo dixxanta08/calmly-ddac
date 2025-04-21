@@ -119,18 +119,18 @@ export default function PatientLayout({ children }) {
 
             {/* Main Content Area */}
             <Layout className="site-layout ">
-                {!emailSubscribed ?<div  className="w-full p-4 bg-amber-200 text-black flex justify-between items-center">
+                {!emailSubscribed ? <div className="w-full p-4 bg-amber-200 text-black flex justify-between items-center">
                     {/* banner for email subscription */}
-                    
+
                     <p>
-                    Please subscribe to our email notifications to receive updates and reminders.</p>
+                        Please subscribe to our email notifications to receive updates and reminders.</p>
                     <Button type="default" variant="outlined" onClick={async () => {
                         try {
-                           const isSuccess = await addSubscription(loggedInUser?.email);
-                           if(isSuccess) {
-                            messageApi.success('Subscription email sent successfully. Check your email.');
-                            setEmailSubscribed(true);
-                        }else{
+                            const isSuccess = await addSubscription(loggedInUser?.email);
+                            if (isSuccess) {
+                                messageApi.success('Subscription email sent successfully. Check your email.');
+                                setEmailSubscribed(true);
+                            } else {
                                 messageApi.error('Failed to send subscription email. Please try again.');
                             }
                         } catch (error) {

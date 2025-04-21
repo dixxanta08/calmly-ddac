@@ -1,6 +1,6 @@
 "use client";
 
-import { Layout, Menu, Input, Avatar, Spin, Popover } from "antd";
+import { Layout, Menu, Input, Avatar, Spin, Popover, Button } from "antd";
 import { FaCalendarAlt, FaBook, FaUser, FaCog } from "react-icons/fa";
 import { SearchOutlined } from '@ant-design/icons';
 import Link from "next/link";
@@ -11,10 +11,39 @@ import { useRouter } from "next/navigation";
 
 const { Sider, Content } = Layout;
 
+// SNS functions
+async function checkSubscriptions(email) {
+    try {
+        const response = await fetch(`/api/sns?email=${encodeURIComponent(email)}`);
+        const data = await response.json();
+        return data.isSubscribed;
+    } catch (error) {
+        console.error('Error checking subscription:', error);
+        return false;
+    }
+}
+
+async function addSubscription(email) {
+    try {
+        const response = await fetch('/api/sns', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+        return data.success;
+    } catch (error) {
+        console.error('Error adding subscription:', error);
+        return false;
+    }
+}
 export default function PatientLayout({ children }) {
     const [loggedInUser, setLoggedInUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [emailSubscribed, setEmailSubscribed] = useState(false);
     const router = useRouter();
 
     useEffect(() => {
@@ -24,6 +53,9 @@ export default function PatientLayout({ children }) {
             const session = await getSession();
             setLoggedInUser(session?.user);
             setLoading(false);
+            const isSubscribed = await checkSubscriptions(session?.user?.email);
+            console.log(isSubscribed);
+            setEmailSubscribed(isSubscribed);
         }, 500);
     }, []);
 
@@ -80,6 +112,25 @@ export default function PatientLayout({ children }) {
 
             {/* Main Content Area */}
             <Layout className="site-layout">
+                {!emailSubscribed ? <div className="w-full p-4 bg-amber-200 text-black flex justify-between items-center">
+                    {/* banner for email subscription */}
+
+                    <p>
+                        Please subscribe to our email notifications to receive updates and reminders.</p>
+                    <Button type="default" variant="outlined" onClick={async () => {
+                        try {
+                            const isSuccess = await addSubscription(loggedInUser?.email);
+                            if (isSuccess) {
+                                messageApi.success('Subscription email sent successfully. Check your email.');
+                                setEmailSubscribed(true);
+                            } else {
+                                messageApi.error('Failed to send subscription email. Please try again.');
+                            }
+                        } catch (error) {
+                            messageApi.error('Failed to send subscription email. Please try again.');
+                        }
+                    }}>Send Subscription Email</Button>
+                </div> : null}
                 <Content className="p-6 bg-white min-h-screen">
                     <div className="flex justify-end items-center mb-6">
                         {/* <h1 className="text-xl font-semibold text-black">Patient Dashboard</h1> */}

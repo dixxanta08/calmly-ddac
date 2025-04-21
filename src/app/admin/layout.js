@@ -1,6 +1,6 @@
 "use client";
 
-import { Layout, Menu, Input, Avatar, Spin, Popover } from "antd";
+import { Layout, Menu, Input, Avatar, Spin, Popover, Button } from "antd";
 import { FaCalendarAlt, FaBook, FaUser, FaCog } from "react-icons/fa";
 import { SearchOutlined } from '@ant-design/icons';
 import Link from "next/link";
@@ -8,17 +8,48 @@ import Image from "next/image";
 import { useState, useEffect } from "react";
 import { getSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-
+import { message } from "antd";
 const { Sider, Content } = Layout;
+
+
+// SNS functions
+async function checkSubscriptions(email) {
+    try {
+        const response = await fetch(`/api/sns?email=${encodeURIComponent(email)}`);
+        const data = await response.json();
+        return data.isSubscribed;
+    } catch (error) {
+        console.error('Error checking subscription:', error);
+        return false;
+    }
+}
+
+async function addSubscription(email) {
+    try {
+        const response = await fetch('/api/sns', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email })
+        });
+        const data = await response.json();
+        return data.success;
+    } catch (error) {
+        console.error('Error adding subscription:', error);
+        return false;
+    }
+}
 
 export default function PatientLayout({ children }) {
     const [loggedInUser, setLoggedInUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
-    
+
     const [imageError, setImageError] = useState(false);
     const router = useRouter();
     const [emailSubscribed, setEmailSubscribed] = useState(false);
+    const [messageApi, messageContextHolder] = message.useMessage();
 
     useEffect(() => {
 
@@ -70,6 +101,7 @@ export default function PatientLayout({ children }) {
     }
     return (
         <Layout className="!min-h-screen">
+            {messageContextHolder}
             {/* Sidebar */}
             <Sider className="!bg-white p-4" width={250} theme="light" collapsedWidth="0" breakpoint="lg">
                 <div className="text-center mb-6 w-full">
@@ -90,9 +122,26 @@ export default function PatientLayout({ children }) {
 
             {/* Main Content Area */}
             <Layout className="site-layout relative">
-                {!emailSubscribed ?<div  className="absolute top-0 left-0 bg-amber-200 text-black">
+                {!emailSubscribed ? <div className="w-full p-4 bg-amber-200 text-black flex justify-between items-center">
                     {/* banner for email subscription */}
-                    Please subscribe to our email notifications to receive updates and reminders.
+
+                    <p>
+                        Please subscribe to our email notifications to receive updates and reminders.</p>
+                    <Button type="default" variant="outlined" onClick={async () => {
+                        try {
+                            const isSuccess = await addSubscription(loggedInUser?.email);
+                            console.log(isSuccess);
+                            if (isSuccess) {
+                                messageApi.success('Subscription email sent successfully. Check your email.');
+                                setEmailSubscribed(true);
+                            } else {
+                                messageApi.error('Failed to send subscription email. Please try again.');
+                            }
+                        } catch (error) {
+                            console.log(error);
+                            messageApi.error('Failed to send subscription email. Please try again.');
+                        }
+                    }}>Send Subscription Email</Button>
                 </div> : null}
                 <Content className="p-6 bg-white min-h-screen">
                     <div className="flex justify-end items-center mb-6">
@@ -107,13 +156,13 @@ export default function PatientLayout({ children }) {
                                     </Link>
                                 </>} >
 
-<Avatar
-  src={!imageError ? loggedInUser?.imageUrl : null}
-  onError={() => setImageError(true)}
->
-  {loggedInUser?.name?.[0]?.toUpperCase()}
-</Avatar>
-</Popover>
+                                <Avatar
+                                    src={!imageError ? loggedInUser?.imageUrl : null}
+                                    onError={() => setImageError(true)}
+                                >
+                                    {loggedInUser?.name?.[0]?.toUpperCase()}
+                                </Avatar>
+                            </Popover>
                             <span className="font-semibold text-black">{loggedInUser?.name}</span>
                         </div>
                     </div>

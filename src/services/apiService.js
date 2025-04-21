@@ -79,22 +79,64 @@ export const requestReset = async (email) => {
 
 
 // upload file
+// export const uploadFile = async (file) => {
+//     try {
+//         const formData = new FormData();
+//         formData.append('file', file);
+
+//         const response = await api.post('/upload', formData, {
+//             headers: {
+//                 'Content-Type': 'multipart/form-data',
+//             },
+//         });
+
+//         return response.data;  // Return the uploaded file URL
+//     } catch (error) {
+//         console.error('Error uploading file:', error);
+//         throw error;
+//     }
+// };
+
 export const uploadFile = async (file) => {
     try {
-        const formData = new FormData();
-        formData.append('file', file);
+        // Read the file as base64
+        const fileContent = await convertFileToBase64(file);
 
-        const response = await api.post('/upload', formData, {
+        const body = {
+            fileContent: fileContent,    // Base64 encoded file content
+            fileName: file.name,         // File name
+            contentType: file.type || 'application/octet-stream', // Content type
+        };
+
+        // Send the file data as JSON to the Lambda function
+        const response = await axios.post('https://h486oktxb7.execute-api.us-east-1.amazonaws.com/dev/upload', body, {
             headers: {
-                'Content-Type': 'multipart/form-data',
+                'Content-Type': 'application/json',
             },
-        });
+        })
+        // api.post('/upload', body, {
+        //     headers: {
+        //         'Content-Type': 'application/json',
+        //     },
+        // });
 
         return response.data;  // Return the uploaded file URL
     } catch (error) {
         console.error('Error uploading file:', error);
         throw error;
     }
+};
+
+// Helper function to convert file to base64
+const convertFileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            resolve(reader.result.split(',')[1]); // Remove the base64 prefix
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file); // Read file as data URL
+    });
 };
 
 
@@ -167,6 +209,7 @@ export const getTherapists = async () => {
 export const getTimeSlotsForTherapistDate = async (therapistId, date) => {
     try {
         const formattedDate = dayjs(date).format('YYYY-MM-DD');
+        console.log("APISERVICe: Fetching time slots for therapist", therapistId, "and date", formattedDate);
 
         const response = await api.get(`/therapists/${therapistId}?date=${formattedDate}`);
 

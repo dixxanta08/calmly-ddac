@@ -36,29 +36,45 @@ const AppointmentCard = ({ appointment, messageApi, refetchAppointments }) => {
   const [form] = Form.useForm();
   const [slots, setSlots] = useState([]);
   const date = Form.useWatch(["date"], form);
+  const therapist_id = Form.useWatch(["therapist_id"], form);
+
   useEffect(() => {
     const fetchTherapistsAvailableSlots = async () => {
-      const fetchedTherapistSlots = await getTimeSlotsForTherapistDate(
-        appointment.therapist_id,
-        date
-      );
-      setSlots(fetchedTherapistSlots);
+      if (appointment && date) {
+        try {
+          // Format the date to YYYY-MM-DD without timezone conversion
+          const formattedDate = date.format("YYYY-MM-DD");
+          console.log(
+            "Fetching time slots for therapist",
+            appointment.therapist_id,
+            "and date",
+            formattedDate
+          );
+
+          const response = await fetch(
+            `/api/therapists/${appointment.therapist_id}?date=${formattedDate}`
+          );
+          if (!response.ok) {
+            throw new Error("Failed to fetch time slots");
+          }
+          const data = await response.json();
+          setSlots(data);
+        } catch (error) {
+          console.error("Error fetching time slots:", error);
+          messageApi.error("Failed to fetch available time slots");
+        }
+      }
     };
 
-    if (date && modalType === "reschedule") {
-      fetchTherapistsAvailableSlots();
-    }
-  }, [date, isModalOpen]);
+    fetchTherapistsAvailableSlots();
+  }, [appointment, date, messageApi]);
 
-  const appointmentTime = dayjs(appointment.appointmentDateTime).utcOffset(
-    5 * 60 + 45
-  ); // Set the UTC offset to +05:45 (Nepal Time)
-
+  // Use local time without UTC conversion
+  const appointmentTime = dayjs(appointment.appointmentDateTime);
   const formattedAppointmentTime = appointmentTime.format(
     "dddd, MMMM D, YYYY h:mm A"
   );
-
-  const currentTime = dayjs().utcOffset(5 * 60 + 45);
+  const currentTime = dayjs();
 
   const isStartingSoon =
     appointmentTime.diff(currentTime, "minute") >= 0 &&
@@ -82,17 +98,17 @@ const AppointmentCard = ({ appointment, messageApi, refetchAppointments }) => {
       });
 
       messageApi.success({
-      content: "Appointment cancelled successfully",
-      duration: 3,
-    });
+        content: "Appointment cancelled successfully",
+        duration: 3,
+      });
       form.resetFields();
       await refetchAppointments();
       setIsModalOpen(false);
     } catch (error) {
       messageApi.error({
-      content: "Error cancelling appointment",
-      duration: 3,
-    });
+        content: "Error cancelling appointment",
+        duration: 3,
+      });
     }
   };
 
@@ -101,36 +117,46 @@ const AppointmentCard = ({ appointment, messageApi, refetchAppointments }) => {
 
     if (!isRescheduleAllowed) {
       messageApi.error({
-      content: "Rescheduling is only allowed up to 15 minutes before the appointment",
-      duration: 4,
-    });
+        content:
+          "Rescheduling is only allowed up to 15 minutes before the appointment",
+        duration: 4,
+      });
       return;
     }
     if (isRescheduled) {
       messageApi.warning({
-      content: "This appointment has already been rescheduled once",
-      duration: 4,
-    });
+        content: "This appointment has already been rescheduled once",
+        duration: 4,
+      });
       return;
     }
 
     try {
+      const [startTime] = formValues.slot.split(" - ");
+      const [hours, minutes] = startTime.split(":");
+
+      // Create appointment datetime in Kathmandu time
+      const appointmentDateTime = dayjs(formValues.date)
+        .hour(parseInt(hours))
+        .minute(parseInt(minutes))
+        .second(0)
+        .subtract(5, "hour")
+        .subtract(45, "minute"); // Convert back to UTC for storage
+
+      console.log("New appointment time (UTC):", appointmentDateTime.format());
+
       await updateAppointment({
         appointmentId: appointment.appointmentId,
         rescheduledReason: formValues.rescheduleReason,
         rescheduledBy: loggedInUser.name,
         rescheduledDateTime: new Date().toISOString(),
-        appointmentDateTime:
-          formValues.date.format("YYYY-MM-DD") +
-          "T" +
-          formValues.slot.split(" - ")[0] +
-          ":00" +
-          "+05:45",
+        appointmentDateTime: appointmentDateTime.format(),
       });
+
       messageApi.success({
-      content: "Appointment rescheduled successfully",
-      duration: 3,
-    });
+        content: "Appointment rescheduled successfully",
+        duration: 3,
+      });
       setIsRescheduled(true);
       setIsModalOpen(false);
       await refetchAppointments();
@@ -138,9 +164,9 @@ const AppointmentCard = ({ appointment, messageApi, refetchAppointments }) => {
     } catch (error) {
       console.log("Error rescheduling appointment:", error);
       messageApi.error({
-      content: "Error rescheduling appointment",
-      duration: 3,
-    });
+        content: "Error rescheduling appointment",
+        duration: 3,
+      });
     }
   };
   const handleEnd = async () => {
@@ -168,17 +194,17 @@ const AppointmentCard = ({ appointment, messageApi, refetchAppointments }) => {
       });
 
       messageApi.success({
-      content: "Feedback submitted successfully",
-      duration: 3,
-    });
+        content: "Feedback submitted successfully",
+        duration: 3,
+      });
       form.resetFields();
       await refetchAppointments();
       setIsModalOpen(false);
     } catch (error) {
       messageApi.error({
-      content: "Error submitting feedback",
-      duration: 3,
-    });
+        content: "Error submitting feedback",
+        duration: 3,
+      });
     }
   };
   const handleMeetingLink = async () => {
@@ -191,26 +217,91 @@ const AppointmentCard = ({ appointment, messageApi, refetchAppointments }) => {
       });
 
       messageApi.success({
-      content: "Meeting link added successfully",
-      duration: 3,
-    });
+        content: "Meeting link added successfully",
+        duration: 3,
+      });
       form.resetFields();
       await refetchAppointments();
       setIsModalOpen(false);
     } catch (error) {
       messageApi.error({
-      content: "Error adding meeting link",
-      duration: 3,
-    });
+        content: "Error adding meeting link",
+        duration: 3,
+      });
     }
   };
   const openModal = (type) => {
     setModalType(type);
     setIsModalOpen(true);
+    if (type === "reschedule") {
+      // Convert UTC time to Kathmandu time (+5:45)
+      const utcTime = dayjs(appointment.appointmentDateTime);
+      console.log("Original UTC time:", appointment.appointmentDateTime);
+
+      // Add 5 hours and 45 minutes to convert to Kathmandu time
+      const ktmTime = utcTime.add(5, "hour").add(45, "minute");
+      console.log("Kathmandu time:", ktmTime.format());
+
+      // Set the date in the form
+      form.setFieldValue("date", ktmTime);
+
+      // Create the time slot string (e.g., "15:00 - 16:00")
+      const hour = ktmTime.hour();
+      const nextHour = (hour + 1) % 24;
+      const timeSlot = `${hour.toString().padStart(2, "0")}:00 - ${nextHour
+        .toString()
+        .padStart(2, "0")}:00`;
+
+      console.log("Setting time slot:", timeSlot);
+      form.setFieldValue("slot", timeSlot);
+    }
   };
   console.log(appointment);
   console.log("isStartingSoon", isStartingSoon);
   console.log("isPast", isPast);
+
+  const handleOk = async () => {
+    try {
+      const values = await form.validateFields();
+      const [startTime] = values.slot.split(" - ");
+
+      // Create appointment date time by combining date and time
+      const appointmentDate = values.date.toDate();
+      const [hours, minutes] = startTime.split(":");
+      appointmentDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+
+      const appointment = {
+        therapist_id: values.therapist_id,
+        therapist_name: therapists.find((t) => t.id === values.therapist_id)
+          ?.name,
+        patient_id: loggedInUser.id,
+        patient_name: loggedInUser.name,
+        bookedDateTime: new Date().toISOString(),
+        appointmentDateTime: appointmentDate.toISOString(),
+        status: "upcoming",
+      };
+
+      const response = await fetch("/api/appointments", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(appointment),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to create appointment");
+      }
+
+      messageApi.success("Appointment booked successfully");
+      setModalVisible(false);
+      form.resetFields();
+      refetchAppointments();
+    } catch (error) {
+      console.error("Error booking appointment:", error);
+      messageApi.error("Failed to book appointment");
+    }
+  };
 
   return (
     <div className="p-4 bg-white rounded-lg shadow-sm mb-4 flex justify-between items-center">
@@ -283,6 +374,10 @@ const AppointmentCard = ({ appointment, messageApi, refetchAppointments }) => {
                   "date",
                   dayjs(appointment.appointmentDateTime)
                 );
+                console.log(
+                  "appointment.appointmentDateTime",
+                  appointment.appointmentDateTime
+                ); //2025-04-19T04:15:00.000Z slot sp we need to add 5+45
                 form.setFieldValue(
                   "slot",
                   appointment.appointmentDateTime.split("T")[1].split(":")[0] +
@@ -325,10 +420,7 @@ const AppointmentCard = ({ appointment, messageApi, refetchAppointments }) => {
           </Button>
         )}
         {appointment.status === "past" && appointment.feedback && (
-          <Button
-            type="default"
-            onClick={() => openModal("viewFeedback")}
-          >
+          <Button type="default" onClick={() => openModal("viewFeedback")}>
             View Feedback
           </Button>
         )}

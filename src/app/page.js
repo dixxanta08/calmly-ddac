@@ -1,4 +1,3 @@
-
 "use client";
 import { getEducationalMaterials, getTherapists } from '@/services/apiService';
 import Image from 'next/image';
@@ -93,7 +92,13 @@ const Home = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {therapists?.map((therapist, index) => (
               <div key={index} className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-                <Image src={therapist?.imageUrl} alt={therapist.name} className="w-full h-48 object-cover" />
+                <Image
+                  src={therapist?.imageUrl || "/profile.png"}
+                  alt={therapist.name}
+                  width={300}
+                  height={192}
+                  className="w-full h-48 object-cover"
+                />
                 <div className="p-6">
                   <h3 className="text-xl font-semibold text-gray-900">{therapist.name}</h3>
                   <p className="mt-2 text-gray-600">{therapist.email}</p>

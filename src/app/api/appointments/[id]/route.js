@@ -1,176 +1,259 @@
-// import { NextResponse } from "next/server";
-// import AWS from "aws-sdk";
-// import { APPOINTMENTSTABLENAME } from "@/constants";
+import { NextResponse } from "next/server";
+import AWS from "aws-sdk";
+import { APPOINTMENTSTABLENAME } from "@/constants";
+import { sendAppointmentNotification } from "../../../../services/notificationService";
 
-// const dynamoDb = new AWS.DynamoDB.DocumentClient({
-//     endpoint: process.env.NEXT_PUBLIC_DYNAMODB_ENDPOINT,
-//     region: process.env.NEXT_PUBLIC_AWS_REGION,
-//     accessKeyId: process.env.NEXT_PUBLIC_DYNAMODB_ACCESS_KEY_ID,
-//     secretAccessKey: process.env.NEXT_PUBLIC_DYNAMODB_SECRET_ACCESS_KEY,
-// });
+const dynamoDb = new AWS.DynamoDB.DocumentClient({
+    endpoint: process.env.NEXT_PUBLIC_DYNAMODB_ENDPOINT,
+    region: process.env.NEXT_PUBLIC_AWS_REGION,
+    accessKeyId: process.env.NEXT_PUBLIC_DYNAMODB_ACCESS_KEY_ID,
+    secretAccessKey: process.env.NEXT_PUBLIC_DYNAMODB_SECRET_ACCESS_KEY,
+});
 
-
-// export async function PATCH(req, { params }) {
-//     const { id } = await params;
-//     const {
-//         rescheduledDateTime,
-//         appointmentDateTime,
-//         rescheduledReason,
-//         rescheduledBy,
-//         cancelledBy,
-//         cancelledReason,
-//         cancellationDate,
-//         meetingLink,
-//         feedback,
-//         status,
-//     } = await req.json();
-
-//     try {
-//         let updateExpression = [];
-//         let expressionAttributeNames = {};
-//         let expressionAttributeValues = {};
-
-//         // Rescheduling updates
-//         if (rescheduledDateTime) {
-//             updateExpression.push(
-//                 "#rdt = :rescheduledDateTime",
-//                 "#adt = :appointmentDateTime",
-//                 "#rr = :rescheduledReason",
-//                 "#rb = :rescheduledBy"
-//             );
-//             expressionAttributeNames["#rdt"] = "rescheduledDateTime";
-//             expressionAttributeNames["#adt"] = "appointmentDateTime";
-//             expressionAttributeNames["#rr"] = "rescheduledReason";
-//             expressionAttributeNames["#rb"] = "rescheduledBy";
-//             expressionAttributeValues[":rescheduledDateTime"] = rescheduledDateTime;
-//             expressionAttributeValues[":appointmentDateTime"] = appointmentDateTime;
-//             expressionAttributeValues[":rescheduledReason"] = rescheduledReason;
-//             expressionAttributeValues[":rescheduledBy"] = rescheduledBy;
-//         }
-
-//         // Cancellation updates (set status as "cancelled" only if cancelledBy is present)
-//         if (cancelledBy) {
-//             updateExpression.push(
-//                 "#cb = :cancelledBy",
-//                 "#cr = :cancelledReason",
-//                 "#cd = :cancellationDate",
-//                 "#st = :status"
-//             );
-//             expressionAttributeNames["#cb"] = "cancelledBy";
-//             expressionAttributeNames["#cr"] = "cancelledReason";
-//             expressionAttributeNames["#cd"] = "cancellationDate";
-//             expressionAttributeNames["#st"] = "status";
-//             expressionAttributeValues[":cancelledBy"] = cancelledBy;
-//             expressionAttributeValues[":cancelledReason"] = cancelledReason;
-//             expressionAttributeValues[":cancellationDate"] = cancellationDate;
-//             expressionAttributeValues[":status"] = "cancelled"; // Priority given to cancellation status
-//         } else if (status) {
-//             // Only update status if it's not set in cancellation
-//             updateExpression.push("#st = :status");
-//             expressionAttributeNames["#st"] = "status";
-//             expressionAttributeValues[":status"] = status;
-//         }
-
-//         // Feedback updates
-//         if (feedback) {
-//             updateExpression.push("#fb = :feedback");
-//             expressionAttributeNames["#fb"] = "feedback";
-//             expressionAttributeValues[":feedback"] = feedback;
-//         }
-//         if (meetingLink) {
-//             updateExpression.push("#ml = :meetingLink");
-//             expressionAttributeNames["#ml"] = "meetingLink";
-//             expressionAttributeValues[":meetingLink"] = meetingLink;
-//         }
-//         if (updateExpression.length === 0) {
-//             return NextResponse.json(
-//                 { error: "No fields provided for update" },
-//                 { status: 400 }
-//             );
-//         }
-
-//         // Build final UpdateExpression string
-//         const finalUpdateExpression = `SET ${updateExpression.join(", ")}`;
-
-//         // Update the item in DynamoDB
-//         await dynamoDb
-//             .update({
-//                 TableName: APPOINTMENTSTABLENAME,
-//                 Key: { appointmentId: id },
-//                 UpdateExpression: finalUpdateExpression,
-//                 ExpressionAttributeNames: expressionAttributeNames,
-//                 ExpressionAttributeValues: expressionAttributeValues,
-//             })
-//             .promise();
-
-//         return NextResponse.json({ message: "Appointment updated successfully" }, { status: 200 });
-//     } catch (error) {
-//         console.error("Error updating appointment:", error);
-//         return NextResponse.json(
-//             { error: "Failed to update appointment" },
-//             { status: 500 }
-//         );
-//     }
-// }
-import { NextResponse } from 'next/server';
-
-import { Appointment, User, EducationalMaterial } from "@/app/models/index";
-
-export async function PATCH(req, { params }) {
+// Get appointment by ID
+export async function GET(req, { params }) {
     const { id } = params;
-    const {
-        rescheduledDateTime,
-        appointmentDateTime,
-        rescheduledReason,
-        rescheduledBy,
-        cancelledBy,
-        cancelledReason,
-        cancellationDate,
-        meetingLink,
-        feedback,
-        status,
-    } = await req.json();
 
     try {
-        const appointment = await Appointment.findOne({ where: { appointmentId: id } });
+        const params = {
+            TableName: APPOINTMENTSTABLENAME,
+            Key: { appointmentId: id }
+        };
 
-        if (!appointment) {
-            return NextResponse.json({ error: 'Appointment not found' }, { status: 404 });
+        const result = await dynamoDb.get(params).promise();
+
+        if (!result.Item) {
+            return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
         }
 
-        // Updating rescheduled data
-        if (rescheduledDateTime) {
-            appointment.rescheduledDateTime = rescheduledDateTime;
-            appointment.appointmentDateTime = appointmentDateTime;
-            appointment.rescheduledReason = rescheduledReason;
-            appointment.rescheduledBy = rescheduledBy;
-        }
-
-        // Handle cancellation
-        if (cancelledBy) {
-            appointment.cancelledBy = cancelledBy;
-            appointment.cancelledReason = cancelledReason;
-            appointment.cancellationDate = cancellationDate;
-            appointment.status = 'cancelled'; // Set the status to 'cancelled' when cancellation details are provided
-        } else if (status) {
-            appointment.status = status; // Update status if no cancellation
-        }
-
-        // Feedback and meeting link updates
-        if (feedback) {
-            appointment.feedback = feedback;
-        }
-        if (meetingLink) {
-            appointment.meetingLink = meetingLink;
-        }
-
-        // Save the updated appointment back to the database
-        await appointment.save();
-
-        return NextResponse.json({ message: 'Appointment updated successfully' }, { status: 200 });
+        return NextResponse.json(result.Item, { status: 200 });
     } catch (error) {
-        console.error('Error updating appointment:', error);
-        return NextResponse.json({ error: 'Failed to update appointment' }, { status: 500 });
+        console.error("Error fetching appointment:", error);
+        return NextResponse.json({ error: "Failed to fetch appointment" }, { status: 500 });
+    }
+}
+
+// Update appointment status
+export async function PUT(req, { params }) {
+    const { id } = params;
+    const { status } = await req.json();
+
+    try {
+        // Get current appointment
+        const result = await dynamoDb.get({
+            TableName: APPOINTMENTSTABLENAME,
+            Key: { appointmentId: id }
+        }).promise();
+
+        if (!result.Item) {
+            return NextResponse.json(
+                { error: "Appointment not found" },
+                { status: 404 }
+            );
+        }
+
+        const appointment = result.Item;
+
+        // Update appointment status
+        await dynamoDb.update({
+            TableName: APPOINTMENTSTABLENAME,
+            Key: { appointmentId: id },
+            UpdateExpression: "set #status = :status",
+            ExpressionAttributeNames: {
+                "#status": "status"
+            },
+            ExpressionAttributeValues: {
+                ":status": status
+            }
+        }).promise();
+
+        // Send notifications if status has changed
+        if (appointment.status !== status) {
+            const therapistEmail = await getUserEmail(appointment.therapist_id);
+            const patientEmail = await getUserEmail(appointment.patient_id);
+
+            console.log("THERAPIST EMAIL", therapistEmail);
+            console.log("PATIENT EMAIL", patientEmail);
+            // Send notification to therapist
+            if (therapistEmail) {
+                await sendAppointmentNotification(therapistEmail, 'updated', {
+                    ...appointment,
+                    status,
+                    therapist_name: appointment.patient_name // Swap names for therapist notification
+                });
+            }
+
+            // Send notification to patient
+            if (patientEmail) {
+                await sendAppointmentNotification(patientEmail, 'updated', {
+                    ...appointment,
+                    status
+                });
+            }
+        }
+
+        return NextResponse.json({ status });
+    } catch (error) {
+        console.error("Error updating appointment:", error);
+        return NextResponse.json(
+            { error: "Failed to update appointment" },
+            { status: 500 }
+        );
+    }
+}
+
+// Delete appointment
+export async function DELETE(req, { params }) {
+    const { id } = params;
+
+    try {
+        // Get appointment details before deletion
+        const result = await dynamoDb.get({
+            TableName: APPOINTMENTSTABLENAME,
+            Key: { appointmentId: id }
+        }).promise();
+
+        if (!result.Item) {
+            return NextResponse.json(
+                { error: "Appointment not found" },
+                { status: 404 }
+            );
+        }
+
+        const appointment = result.Item;
+
+        // Delete appointment
+        await dynamoDb.delete({
+            TableName: APPOINTMENTSTABLENAME,
+            Key: { appointmentId: id }
+        }).promise();
+
+        // Send notifications about cancellation
+        const therapistEmail = await getUserEmail(appointment.therapist_id);
+        const patientEmail = await getUserEmail(appointment.patient_id);
+
+        // Send notification to therapist
+        if (therapistEmail) {
+            await sendAppointmentNotification(therapistEmail, 'cancelled', {
+                ...appointment,
+                therapist_name: appointment.patient_name // Swap names for therapist notification
+            });
+        }
+
+        // Send notification to patient
+        if (patientEmail) {
+            await sendAppointmentNotification(patientEmail, 'cancelled', appointment);
+        }
+
+        return NextResponse.json({ message: "Appointment deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting appointment:", error);
+        return NextResponse.json(
+            { error: "Failed to delete appointment" },
+            { status: 500 }
+        );
+    }
+}
+
+// Helper function to get user email by ID
+async function getUserEmail(userId) {
+    try {
+        const params = {
+            TableName: "users",
+            Key: { id: userId }
+        };
+
+        const result = await dynamoDb.get(params).promise();
+        return result.Item?.email;
+    } catch (error) {
+        console.error("Error fetching user email:", error);
+        return null;
+    }
+}
+
+export async function PATCH(req, { params }) {
+    const { id } = await params;
+    const updates = await req.json();
+
+    try {
+        // Get current appointment
+        const result = await dynamoDb.get({
+            TableName: APPOINTMENTSTABLENAME,
+            Key: { appointmentId: id }
+        }).promise();
+
+        if (!result.Item) {
+            return NextResponse.json(
+                { error: "Appointment not found" },
+                { status: 404 }
+            );
+        }
+
+        const appointment = result.Item;
+        const previousStatus = appointment.status;
+
+        // Prepare update expression parts
+        const updateParts = [];
+        const expressionAttributeNames = {};
+        const expressionAttributeValues = {};
+
+        // Handle each update field
+        Object.entries(updates).forEach(([key, value]) => {
+            if (key !== 'appointmentId') { // Don't allow updating the ID
+                updateParts.push(`#${key} = :${key}`);
+                expressionAttributeNames[`#${key}`] = key;
+                expressionAttributeValues[`:${key}`] = value;
+            }
+        });
+
+        // Add updatedAt timestamp
+        updateParts.push("#updatedAt = :updatedAt");
+        expressionAttributeNames["#updatedAt"] = "updatedAt";
+        expressionAttributeValues[":updatedAt"] = new Date().toISOString();
+
+        // Combine all update parts
+        const updateExpression = "set " + updateParts.join(", ");
+
+        // Update appointment
+        await dynamoDb.update({
+            TableName: APPOINTMENTSTABLENAME,
+            Key: { appointmentId: id },
+            UpdateExpression: updateExpression,
+            ExpressionAttributeNames: expressionAttributeNames,
+            ExpressionAttributeValues: expressionAttributeValues,
+            ReturnValues: "ALL_NEW"
+        }).promise();
+
+        // Send notifications if status has changed
+        if (updates.status && previousStatus !== updates.status) {
+            const therapistEmail = await getUserEmail(appointment.therapist_id);
+            const patientEmail = await getUserEmail(appointment.patient_id);
+
+            // Send notification to therapist
+            if (therapistEmail) {
+                await sendAppointmentNotification(therapistEmail, 'updated', {
+                    ...appointment,
+                    ...updates,
+                    therapist_name: appointment.patient_name // Swap names for therapist notification
+                });
+            }
+
+            // Send notification to patient
+            if (patientEmail) {
+                await sendAppointmentNotification(patientEmail, 'updated', {
+                    ...appointment,
+                    ...updates
+                });
+            }
+        }
+
+        return NextResponse.json({ message: "Appointment updated successfully" });
+    } catch (error) {
+        console.error("Error updating appointment:", error);
+        return NextResponse.json(
+            { error: "Failed to update appointment" },
+            { status: 500 }
+        );
     }
 }
 

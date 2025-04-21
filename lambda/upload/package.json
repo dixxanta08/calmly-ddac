@@ -1,0 +1,12 @@
+{
+  "name": "upload-lambda",
+  "version": "1.0.0",
+  "description": "Lambda function for file uploads to S3",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1531.0"
+  }
+}

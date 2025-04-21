@@ -103,6 +103,8 @@ export default function AdminUsersPage() {
                     );
                     messageApi.success("User updated successfully");
                     setIsModalOpen(false);
+                    // clear modal
+                    form.resetFields();
                 } catch (error) {
                     // Log the entire error object to check its structure
                     console.error("Error during update:", error);
@@ -128,6 +130,8 @@ export default function AdminUsersPage() {
                     setUsers(fetchedUsers);
 
                     messageApi.success("User added successfully");
+                    // clear modal
+                    form.resetFields();
 
                     setIsModalOpen(false);
                 } catch (error) {

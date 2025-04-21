@@ -55,6 +55,8 @@ export default function Therapists() {
                                 <Image
                                     alt={therapist.name}
                                     src={therapist.imageUrl || "/profile.png"}
+                                    width={300}
+                                    height={160}
                                     className="h-40 object-cover"
                                 />
                             }

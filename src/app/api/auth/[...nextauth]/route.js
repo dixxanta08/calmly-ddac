@@ -131,8 +131,14 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
+import AWS from 'aws-sdk';
 
-import { User } from "@/app/models"; // Import your User model
+const dynamoDb = new AWS.DynamoDB.DocumentClient({
+    endpoint: process.env.NEXT_PUBLIC_DYNAMODB_ENDPOINT,
+    region: process.env.NEXT_PUBLIC_AWS_REGION,
+    accessKeyId: process.env.NEXT_PUBLIC_DYNAMODB_ACCESS_KEY_ID,
+    secretAccessKey: process.env.NEXT_PUBLIC_DYNAMODB_SECRET_ACCESS_KEY,
+});
 
 const handler = NextAuth({
     providers: [
@@ -145,9 +151,16 @@ const handler = NextAuth({
             async authorize(credentials) {
                 if (credentials?.trigger === "refresh") {
                     // For session refresh, do not require password, just fetch user by email
-                    const user = await User.findOne({
-                        where: { email: credentials.email },
-                    });
+                    const params = {
+                        TableName: 'users',
+                        FilterExpression: 'email = :email',
+                        ExpressionAttributeValues: {
+                            ':email': credentials.email
+                        }
+                    };
+
+                    const result = await dynamoDb.scan(params).promise();
+                    const user = result.Items[0];
 
                     if (!user) {
                         throw new Error("Invalid email or password");
@@ -169,9 +182,16 @@ const handler = NextAuth({
                     throw new Error("Missing credentials");
                 }
 
-                const user = await User.findOne({
-                    where: { email: credentials.email },
-                });
+                const params = {
+                    TableName: 'users',
+                    FilterExpression: 'email = :email',
+                    ExpressionAttributeValues: {
+                        ':email': credentials.email
+                    }
+                };
+
+                const result = await dynamoDb.scan(params).promise();
+                const user = result.Items[0];
 
                 if (!user) {
                     throw new Error("Invalid email or password");
@@ -191,42 +211,22 @@ const handler = NextAuth({
                     imageUrl: user.imageUrl,
                 };
             }
-
-        }),
+        })
     ],
     pages: {
-        signIn: "/login", // Optional: Custom login page
+        signIn: "/login",
     },
     session: {
-        strategy: "jwt", // Use JWT for session handling
+        strategy: "jwt",
     },
     callbacks: {
-        async jwt({ token, user, session, trigger }) {
-            if (trigger === "refresh") {
-                // Fetch the latest user data from the database based on the session user
-                const updatedUser = await User.findOne({
-                    where: { email: session.user.email },
-                });
-
-                if (!updatedUser) {
-                    throw new Error("User not found");
-                }
-
-                // Update the token with the latest user data
-                token.id = updatedUser.id;
-                token.email = updatedUser.email;
-                token.name = updatedUser.name;
-                token.phone = updatedUser.phone;
-                token.role = updatedUser.role;
-                token.imageUrl = updatedUser.imageUrl;
-            } else if (user) {
-                // Initialize token when a user first logs in
+        async jwt({ token, user }) {
+            if (user) {
                 token.id = user.id;
                 token.email = user.email;
                 token.name = user.name;
-                token.phone = user.phone; // Add phone if needed
                 token.role = user.role;
-
+                token.phone = user.phone;
                 token.imageUrl = user.imageUrl;
             }
             return token;
@@ -236,13 +236,14 @@ const handler = NextAuth({
                 session.user.id = token.id;
                 session.user.email = token.email;
                 session.user.name = token.name;
-                session.user.phone = token.phone; // Add phone if needed
-                session.user.role = token.role; // Add role to the session
+                session.user.role = token.role;
+                session.user.phone = token.phone;
                 session.user.imageUrl = token.imageUrl;
             }
             return session;
-        },
-    },
+        }
+    }
 });
 
-export { handler as GET, handler as POST };  // Export handler for GET and POST requests
+export const GET = handler;
+export const POST = handler;

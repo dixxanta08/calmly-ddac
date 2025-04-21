@@ -1,72 +1,72 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { User, Appointment, EducationalMaterial } from '@/app/models';
-import Sequelize from 'sequelize';
-import { Op } from 'sequelize';
+import AWS from 'aws-sdk';
+
+const dynamoDb = new AWS.DynamoDB.DocumentClient({
+    endpoint: process.env.NEXT_PUBLIC_DYNAMODB_ENDPOINT,
+    region: process.env.NEXT_PUBLIC_AWS_REGION,
+    accessKeyId: process.env.NEXT_PUBLIC_DYNAMODB_ACCESS_KEY_ID,
+    secretAccessKey: process.env.NEXT_PUBLIC_DYNAMODB_SECRET_ACCESS_KEY,
+});
 
 export async function GET(request) {
     try {
         // Check authentication and admin role
-
+        const session = await getServerSession();
+        if (!session || session.user.role !== 'admin') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
 
         // Get total users count by role
-        const userStats = await User.findAll({
-            attributes: [
-                'role',
-                [Sequelize.fn('COUNT', Sequelize.col('id')), 'count']
-            ],
-            group: ['role']
+        const usersResult = await dynamoDb.scan({
+            TableName: 'users'
+        }).promise();
+
+        const userStats = {};
+        usersResult.Items.forEach(user => {
+            userStats[user.role] = (userStats[user.role] || 0) + 1;
         });
 
         // Get total appointments count and stats
-        const totalAppointments = await Appointment.count();
-        const upcomingAppointments = await Appointment.count({
-            where: { status: 'upcoming' }
-        });
-        const completedAppointments = await Appointment.count({
-            where: { status: 'completed' }
-        });
+        const appointmentsResult = await dynamoDb.scan({
+            TableName: 'appointments'
+        }).promise();
+
+        const appointments = appointmentsResult.Items;
+        const totalAppointments = appointments.length;
+        const upcomingAppointments = appointments.filter(apt => apt.status === 'upcoming').length;
+        const completedAppointments = appointments.filter(apt => apt.status === 'completed').length;
 
         // Get appointments for current month
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
-        const monthlyAppointments = await Appointment.count({
-            where: {
-                appointmentDateTime: {
-                    [Op.between]: [startOfMonth, endOfMonth]
-                }
-            }
-        });
+        const monthlyAppointments = appointments.filter(apt => {
+            const aptDate = new Date(apt.appointmentDateTime);
+            return aptDate >= startOfMonth && aptDate <= endOfMonth;
+        }).length;
 
         // Get educational materials stats
-        const totalMaterials = await EducationalMaterial.count();
+        const materialsResult = await dynamoDb.scan({
+            TableName: 'educationalMaterials'
+        }).promise();
 
-        // Get all materials to analyze tags
-        const allMaterials = await EducationalMaterial.findAll({
-            attributes: ['tags']
-        });
+        const totalMaterials = materialsResult.Items.length;
 
         // Analyze tags to create category stats
         const tagStats = {};
-        allMaterials.forEach(material => {
+        materialsResult.Items.forEach(material => {
             const tags = material.tags || [];
             tags.forEach(tag => {
                 tagStats[tag] = (tagStats[tag] || 0) + 1;
             });
         });
 
-        // Format user stats
-        const formattedUserStats = {};
-        userStats.forEach(stat => {
-            formattedUserStats[stat.role] = stat.getDataValue('count');
-        });
-
         const report = {
             users: {
-                total: Object.values(formattedUserStats).reduce((a, b) => a + b, 0),
-                byRole: formattedUserStats
+                total: Object.values(userStats).reduce((a, b) => a + b, 0),
+                byRole: userStats
             },
             appointments: {
                 total: totalAppointments,

@@ -5,6 +5,7 @@ import { PlusOutlined } from "@ant-design/icons";
 import { createAppointment, getAppointments, getTherapists, getTimeSlotsForTherapistDate } from "../../../services/apiService";
 import AppointmentCard from "./AppointmentCard";
 import { getSession } from "next-auth/react";
+import dayjs from "dayjs";
 
 export default function Appointments() {
     const [modalVisible, setModalVisible] = useState(false);
@@ -43,13 +44,13 @@ export default function Appointments() {
             } catch (error) {
                 console.error("Error fetching appointments:", error);
                 messageApi.error({
-            content: "Failed to fetch appointments",
-            duration: 3,
-        });
+                    content: "Failed to fetch appointments",
+                    duration: 3,
+                });
             }
             setLoading(false);
         }
-        if(loggedInUser?.role && loggedInUser?.id) {
+        if (loggedInUser?.role && loggedInUser?.id) {
             fetchAppointments();
         }
     }, [loggedInUser, messageApi]);
@@ -73,22 +74,35 @@ export default function Appointments() {
         } catch (error) {
             console.error("Error fetching appointments:", error);
             messageApi.error({
-            content: "Failed to fetch appointments",
-            duration: 3,
-        });
+                content: "Failed to fetch appointments",
+                duration: 3,
+            });
         }
     }
     useEffect(() => {
         const fetchTherapistsAvailableSlots = async () => {
-            console.log("Fetching slots for therapist and date", therapist_id, date);
-            const fetchedTherapistSlots = await getTimeSlotsForTherapistDate(therapist_id, date);
-            setSlots(fetchedTherapistSlots);
-        }
-        if (therapist_id && date) {
-            console.log("Fetching slots for therapist and date", therapist_id, date);
-            fetchTherapistsAvailableSlots();
-        }
-    }, [therapist_id, date]);
+            if (therapist_id && date) {
+                console.log("Fetching time slots for therapist", therapist_id, "and date", date);
+                // Fetching time slots for therapist 1744949325170 and date M {$L: 'en', $offset: 345, $u: false, $d: Fri Apr 18 2025 00:00:00 GMT+0545 (Nepal Time), $y: 2025, …}
+                try {
+                    // format day by excluding timezone
+                    const formattedDate = dayjs(date).format('YYYY-MM-DD'); // this will convert based on time zone so instead we will use the following
+                    const response = await fetch(`/api/therapists/${therapist_id}?date=${formattedDate}`);
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch time slots');
+                    }
+                    const data = await response.json();
+                    setSlots(data);
+                } catch (error) {
+                    console.error('Error fetching time slots:', error);
+                    messageApi.error('Failed to fetch available time slots');
+                }
+            }
+        };
+        console.log("Fetching time slots for therapist", therapist_id, "and date", date);
+
+        fetchTherapistsAvailableSlots();
+    }, [therapist_id, date, messageApi]);
 
 
     const handleCancel = () => {
@@ -97,33 +111,43 @@ export default function Appointments() {
     };
     const handleOk = async () => {
         try {
-            const formValues = form.getFieldsValue();
-            const localDate = new Date(formValues.date);
-            localDate.setMinutes(localDate.getMinutes() - localDate.getTimezoneOffset()); // Adjust to local time
+            const values = await form.validateFields();
+            const [startTime] = values.slot.split(' - ');
 
-            const appointmentDateTime = localDate.toISOString().split("T")[0] + "T" + formValues.slot.split(" - ")[0] + ":00" + "+05:45";
-
+            // Create appointment date time by combining date and time
+            const appointmentDateTime = new Date(values.date);
+            const [hours, minutes] = startTime.split(':');
+            appointmentDateTime.setHours(parseInt(hours), parseInt(minutes), 0, 0);
 
             const appointment = {
-                therapist_id: formValues.therapist_id,
-                therapist_name: therapists.find(therapist => therapist.id === formValues.therapist_id).name,
+                therapist_id: values.therapist_id,
+                therapist_name: therapists.find(t => t.id === values.therapist_id)?.name,
                 patient_id: loggedInUser.id,
                 patient_name: loggedInUser.name,
-                status: "upcoming",
                 bookedDateTime: new Date().toISOString(),
-                appointmentDateTime: appointmentDateTime,
+                appointmentDateTime: appointmentDateTime.toISOString(),
+                status: 'upcoming'
             };
-            await createAppointment(appointment);
+
+            const response = await fetch('/api/appointments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(appointment),
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to create appointment');
+            }
+
+            messageApi.success('Appointment booked successfully');
             setModalVisible(false);
             form.resetFields();
-            await refetchAppointments();
-
+            refetchAppointments();
         } catch (error) {
-            console.log(error);
-            messageApi.error({
-            content: "Failed to book appointment",
-            duration: 3,
-        });
+            console.error('Error booking appointment:', error);
+            messageApi.error('Failed to book appointment');
         }
     };
 
